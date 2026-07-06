@@ -1,0 +1,4 @@
+{
+  "require": "out-test/test/support/setup.js",
+  "spec": "out-test/test/**/*.test.js"
+}
