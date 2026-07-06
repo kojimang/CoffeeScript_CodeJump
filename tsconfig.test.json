@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "ignoreDeprecations": "6.0",
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "types": ["node", "mocha"],
+    "outDir": "out-test",
+    "rootDir": ".",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "//": "src 全体とテストをコンパイル。vscode は @types/vscode で型付けし、実行時は setup で差し替える",
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

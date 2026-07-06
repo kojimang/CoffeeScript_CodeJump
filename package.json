@@ -1,0 +1,102 @@
+{
+  "name": "coffeescript-codejump",
+  "displayName": "CoffeeScript CodeJump",
+  "description": "CoffeeScriptファイルのコードジャンプ（定義ジャンプ）とアウトラインを提供するVSCode拡張機能",
+  "version": "0.0.1",
+  "publisher": "gorippon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kojimang/CoffeeScript_CodeJump.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "coffeescript",
+    "coffee",
+    "definition",
+    "goto",
+    "navigation"
+  ],
+  "activationEvents": [
+    "onLanguage:coffeescript"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "coffeescript",
+        "aliases": [
+          "CoffeeScript",
+          "coffeescript",
+          "coffee"
+        ],
+        "extensions": [
+          ".coffee",
+          ".litcoffee",
+          ".coffee.md",
+          ".cake"
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "CoffeeScript CodeJump",
+      "properties": {
+        "coffeescriptCodeJump.enableWorkspaceIndex": {
+          "type": "boolean",
+          "default": true,
+          "description": "ワークスペース全体の .coffee ファイルを索引し、定義ジャンプのフォールバック候補として使用します。"
+        },
+        "coffeescriptCodeJump.moduleFileExtensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".coffee",
+            ".litcoffee",
+            ".coffee.md",
+            ".js"
+          ],
+          "description": "require/import のパス解決時に試すファイル拡張子（先頭のものから優先）。"
+        },
+        "coffeescriptCodeJump.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/bower_components/**"
+          ],
+          "description": "ワークスペース索引から除外する glob パターン。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit -p ./tsconfig.json",
+    "compile-tests": "tsc -p ./tsconfig.test.json",
+    "test": "npm run compile-tests && mocha",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "coffee-lex": "^9.3.2"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^18.19.130",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "mocha": "^11.7.6",
+    "typescript": "^6.0.3"
+  }
+}
