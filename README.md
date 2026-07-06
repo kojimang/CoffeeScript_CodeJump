@@ -1,0 +1,2 @@
+# CoffeeScript_CodeJump
+CoffeeScriptファイルのコードジャンプを可能にするVSCode拡張機能
