@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SymbolIndex } from "./symbolIndex";
 import { SymbolDef, Rng } from "./types";
-import { toRange, toSymbolKind } from "./providerUtil";
+import { isMajorSymbol, toRange, toSymbolKind } from "./providerUtil";
 
 /**
  * アウトライン / パンくず / Ctrl+Shift+O 用のシンボルツリーを提供する。
@@ -18,17 +18,6 @@ export class CoffeeDocumentSymbolProvider implements vscode.DocumentSymbolProvid
   }
 }
 
-/** アウトラインに出すシンボルか（param と関数内ローカル変数は除外してノイズを抑える） */
-function isOutlineSymbol(def: SymbolDef): boolean {
-  if (def.kind === "param") {
-    return false;
-  }
-  if (def.kind === "variable" && def.scopeId !== 0) {
-    return false;
-  }
-  return true;
-}
-
 /** inner が outer の範囲に完全に含まれるか（行・列で比較） */
 function contains(outer: Rng, inner: Rng): boolean {
   const startsAfter =
@@ -43,7 +32,7 @@ function contains(outer: Rng, inner: Rng): boolean {
 }
 
 function buildTree(symbols: SymbolDef[]): vscode.DocumentSymbol[] {
-  const defs = symbols.filter(isOutlineSymbol);
+  const defs = symbols.filter(isMajorSymbol);
 
   // range の開始が早い順・広い範囲が先。区間スタックで親子を決める。
   defs.sort((a, b) => {

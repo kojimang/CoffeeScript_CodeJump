@@ -74,6 +74,42 @@ export class DocumentSymbol {
   ) {}
 }
 
+export class MarkdownString {
+  value = "";
+  appendCodeblock(code: string, language = ""): void {
+    this.value += "```" + language + "\n" + code + "\n```\n";
+  }
+  appendMarkdown(text: string): void {
+    this.value += text;
+  }
+}
+
+export class Hover {
+  constructor(public contents: MarkdownString, public range?: Range) {}
+}
+
+export enum DocumentHighlightKind {
+  Text = 0,
+  Read = 1,
+  Write = 2,
+}
+
+export class DocumentHighlight {
+  constructor(
+    public range: Range,
+    public kind: DocumentHighlightKind = DocumentHighlightKind.Text
+  ) {}
+}
+
+export class SymbolInformation {
+  constructor(
+    public name: string,
+    public kind: SymbolKind,
+    public containerName: string,
+    public location: Location
+  ) {}
+}
+
 export class Disposable {
   dispose(): void {
     /* no-op */
@@ -157,8 +193,17 @@ export const workspace = {
       return new Uint8Array(fs.readFileSync(uri.fsPath));
     },
   },
+  // ワークスペース索引テスト用に fixtures の .coffee を返す
   async findFiles(): Promise<Uri[]> {
-    return [];
+    const dir = nodePath.join(__dirname, "..", "..", "..", "test", "fixtures");
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".coffee"))
+      .map((f) => Uri.file(nodePath.join(dir, f)));
+  },
+  asRelativePath(uri: Uri | string): string {
+    const p = typeof uri === "string" ? uri : uri.fsPath;
+    return nodePath.basename(p);
   },
   createFileSystemWatcher() {
     return {
@@ -188,6 +233,18 @@ export const languages = {
   registerDocumentSymbolProvider() {
     return new Disposable();
   },
+  registerHoverProvider() {
+    return new Disposable();
+  },
+  registerReferenceProvider() {
+    return new Disposable();
+  },
+  registerDocumentHighlightProvider() {
+    return new Disposable();
+  },
+  registerWorkspaceSymbolProvider() {
+    return new Disposable();
+  },
 };
 
 /** provider 群の `require('vscode')` に返す集約オブジェクト */
@@ -198,6 +255,11 @@ export const vscodeStub = {
   FileType,
   SymbolKind,
   DocumentSymbol,
+  MarkdownString,
+  Hover,
+  DocumentHighlight,
+  DocumentHighlightKind,
+  SymbolInformation,
   Disposable,
   Uri,
   workspace,

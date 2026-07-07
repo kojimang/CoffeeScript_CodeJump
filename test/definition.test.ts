@@ -4,72 +4,47 @@
 import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
-import { Position, TextDocument, Uri } from "./support/vscodeMock";
+import { FIXTURES, openDoc, lineOf, posIn } from "./support/helpers";
 import { SymbolIndex } from "../src/symbolIndex";
+import { SymbolResolver } from "../src/resolver";
 import { CoffeeDefinitionProvider } from "../src/definitionProvider";
 import { CoffeeDocumentSymbolProvider } from "../src/documentSymbolProvider";
 
-const FIXTURES = path.join(__dirname, "..", "..", "test", "fixtures");
-
-function openDoc(name: string): TextDocument {
-  const p = path.join(FIXTURES, name);
-  return new TextDocument(Uri.file(p), fs.readFileSync(p, "utf8"));
-}
-
-/** 指定行のテキストから語の開始列を求める */
-function col(doc: TextDocument, line: number, word: string): number {
-  const text = (doc.getText() as string).split("\n")[line];
-  const c = text.indexOf(word);
-  assert.ok(c >= 0, `line ${line} に "${word}" が無い`);
-  return c;
-}
-
 describe("CoffeeDefinitionProvider", () => {
   const index = new SymbolIndex();
-  const provider = new CoffeeDefinitionProvider(index);
+  const provider = new CoffeeDefinitionProvider(new SymbolResolver(index));
   const sample = openDoc("sample.coffee");
-  const lines = (sample.getText() as string).split("\n");
+  const lines = sample.getText().split("\n");
 
-  const lineOf = (needle: string): number => {
-    const i = lines.findIndex((l) => l.includes(needle));
-    assert.ok(i >= 0, `"${needle}" を含む行が無い`);
-    return i;
-  };
-
-  async function def(line: number, word: string) {
-    const pos = new Position(line, col(sample, line, word) + 1);
-    // provider は vscode.TextDocument を要求するのでキャストして渡す
-    return provider.provideDefinition(sample as never, pos as never);
+  async function def(needle: string, word: string) {
+    return provider.provideDefinition(
+      sample as never,
+      posIn(sample, needle, word) as never
+    );
   }
 
   it("関数本体のローカル変数(sum)の定義へ飛ぶ", async () => {
-    const usage = lineOf("  sum"); // `  sum` 単独行（sum を返す行）
-    const locs = await def(usage, "sum");
+    const locs = await def("  sum", "sum"); // sum を返す行
     assert.strictEqual(locs.length, 1);
-    // 定義行は `  sum = a + b`
-    assert.strictEqual(locs[0].range.start.line, lineOf("sum = a + b"));
+    assert.strictEqual(locs[0].range.start.line, lineOf(sample, "sum = a + b"));
   });
 
   it("パラメータ(a)の定義へ飛ぶ（関数本体スコープ）", async () => {
-    const usage = lineOf("sum = a + b");
-    const locs = await def(usage, "a");
+    const locs = await def("sum = a + b", "a");
     assert.strictEqual(locs.length, 1);
-    assert.strictEqual(locs[0].range.start.line, lineOf("add = (a, b)"));
+    assert.strictEqual(locs[0].range.start.line, lineOf(sample, "add = (a, b)"));
   });
 
   it("トップレベル関数(add)の定義へ飛ぶ", async () => {
-    const usage = lineOf("result = add");
-    const locs = await def(usage, "add");
+    const locs = await def("result = add", "add");
     assert.strictEqual(locs.length, 1);
-    assert.strictEqual(locs[0].range.start.line, lineOf("add = (a, b)"));
+    assert.strictEqual(locs[0].range.start.line, lineOf(sample, "add = (a, b)"));
   });
 
   it("require 束縛(Helper)から別ファイルの定義へ飛ぶ（ファイル間ジャンプ）", async () => {
-    const line = lineOf("Helper = require");
-    const locs = await def(line, "Helper");
+    const locs = await def("Helper = require", "Helper");
     assert.strictEqual(locs.length, 1);
     assert.ok(locs[0].uri.fsPath.endsWith("helper.coffee"), "helper.coffee へ飛ぶ");
-    // helper.coffee の `class Helper` 行
     const helperLines = fs
       .readFileSync(path.join(FIXTURES, "helper.coffee"), "utf8")
       .split("\n");
@@ -78,8 +53,7 @@ describe("CoffeeDefinitionProvider", () => {
   });
 
   it("メンバ参照(dog.speak)はメソッド定義（同名2件）へ飛ぶ", async () => {
-    const line = lineOf("dog.speak");
-    const locs = await def(line, "speak");
+    const locs = await def("dog.speak", "speak");
     assert.strictEqual(locs.length, 2, "Animal と Dog の speak 2件");
     const defLines = locs.map((l) => l.range.start.line).sort((a, b) => a - b);
     const speakLines = lines
@@ -90,8 +64,7 @@ describe("CoffeeDefinitionProvider", () => {
   });
 
   it("未知の識別子は定義なし（空配列）", async () => {
-    const line = lineOf("for item in items");
-    const locs = await def(line, "items");
+    const locs = await def("for item in items", "items");
     assert.strictEqual(locs.length, 0);
   });
 });
