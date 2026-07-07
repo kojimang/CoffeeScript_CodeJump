@@ -23,7 +23,7 @@ export class SymbolIndex implements vscode.Disposable {
   private fileCache = new Map<string, FileEntry>();
   /** 定義名 → その名前を持つ定義（uri とともに） */
   private nameIndex = new Map<string, Array<{ uri: vscode.Uri; def: SymbolDef }>>();
-  private indexedFiles = new Set<string>();
+  private indexedFiles = new Map<string, vscode.Uri>();
   private watcher: vscode.FileSystemWatcher | undefined;
   private indexBuilt = false;
 
@@ -66,6 +66,40 @@ export class SymbolIndex implements vscode.Disposable {
   /** ワークスペース索引から同名の定義を引く（未構築なら空配列） */
   lookupName(name: string): Array<{ uri: vscode.Uri; def: SymbolDef }> {
     return this.nameIndex.get(name) ?? [];
+  }
+
+  /** 名前のサブシーケンス一致でワークスペース索引を検索（Ctrl+T 用）。空クエリは全件。 */
+  searchByName(query: string): Array<{ uri: vscode.Uri; def: SymbolDef }> {
+    const q = query.toLowerCase();
+    const out: Array<{ uri: vscode.Uri; def: SymbolDef }> = [];
+    for (const [name, list] of this.nameIndex) {
+      if (q && !isSubsequence(q, name.toLowerCase())) {
+        continue;
+      }
+      out.push(...list);
+    }
+    return out;
+  }
+
+  /** ワークスペース索引済みファイルの URI 一覧（参照検索の走査対象） */
+  getIndexedUris(): vscode.Uri[] {
+    return [...this.indexedFiles.values()];
+  }
+
+  /** URI のテキスト（開いていればエディタ内容、なければディスク） */
+  async getTextForUri(uri: vscode.Uri): Promise<string | undefined> {
+    const open = vscode.workspace.textDocuments.find(
+      (d) => d.uri.toString() === uri.toString()
+    );
+    if (open) {
+      return open.getText();
+    }
+    try {
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      return Buffer.from(bytes).toString("utf8");
+    } catch {
+      return undefined;
+    }
   }
 
   /** 設定に応じてワークスペース索引を構築し、ファイル監視を開始する */
@@ -114,7 +148,7 @@ export class SymbolIndex implements vscode.Disposable {
         this.nameIndex.set(def.name, [{ uri, def }]);
       }
     }
-    this.indexedFiles.add(uri.toString());
+    this.indexedFiles.set(uri.toString(), uri);
   }
 
   private removeFromIndex(uri: vscode.Uri): void {
@@ -147,4 +181,15 @@ export class SymbolIndex implements vscode.Disposable {
     this.nameIndex.clear();
     this.indexedFiles.clear();
   }
+}
+
+/** query の全文字が target 中に順序を保って現れるか（VSCode 風のゆるい絞り込み） */
+function isSubsequence(query: string, target: string): boolean {
+  let qi = 0;
+  for (let ti = 0; ti < target.length && qi < query.length; ti++) {
+    if (target[ti] === query[qi]) {
+      qi++;
+    }
+  }
+  return qi === query.length;
 }

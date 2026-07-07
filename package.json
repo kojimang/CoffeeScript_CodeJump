@@ -2,7 +2,7 @@
   "name": "coffeescript-codejump",
   "displayName": "CoffeeScript CodeJump",
   "description": "CoffeeScriptファイルのコードジャンプ（定義ジャンプ）とアウトラインを提供するVSCode拡張機能",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "gorippon",
   "license": "MIT",
   "repository": {

@@ -11,6 +11,17 @@ import { DefKind, Pos, Rng, ScanResult, SymbolDef } from "./types";
 
 const IDENT_RE = /^[$A-Za-z_][$A-Za-z0-9_]*$/;
 
+/** 定義登録コールバックのオプション */
+interface PushOpts {
+  container?: string;
+  moduleSpecifier?: string;
+  scopeId?: number;
+  range?: Rng;
+}
+
+/** 定義登録コールバック */
+type PushFn = (nameTok: SourceToken, kind: DefKind, opts?: PushOpts) => void;
+
 /** 行頭からの空白量（tab は 1 文字として数える）。CoffeeScript は同一ブロック内での混在を禁じるため単純計数で十分。 */
 function indentWidth(line: string): number {
   let i = 0;
@@ -211,11 +222,7 @@ function tokenScan(source: string, tokens: SourceToken[]): ScanResult {
   const symbols: SymbolDef[] = [];
   const seen = new Set<string>(); // 同一位置の重複防止
 
-  const push = (
-    nameTok: SourceToken,
-    kind: DefKind,
-    opts: { container?: string; moduleSpecifier?: string; scopeId?: number; range?: Rng } = {}
-  ) => {
+  const push: PushFn = (nameTok, kind, opts = {}) => {
     const name = text(nameTok);
     if (!IDENT_RE.test(name)) {
       return;
@@ -480,11 +487,7 @@ function collectParams(
   sig: SourceToken[],
   from: number,
   childScopeId: number | undefined,
-  push: (
-    nameTok: SourceToken,
-    kind: DefKind,
-    opts?: { container?: string; moduleSpecifier?: string; scopeId?: number; range?: Rng }
-  ) => void
+  push: PushFn
 ): void {
   if (sig[from]?.type !== SourceType.LPAREN) {
     return;
@@ -554,11 +557,7 @@ function handleImport(
   line: number,
   lineOf: (t: SourceToken) => number,
   text: (t: SourceToken) => string,
-  push: (
-    nameTok: SourceToken,
-    kind: DefKind,
-    opts?: { container?: string; moduleSpecifier?: string; scopeId?: number; range?: Rng }
-  ) => void
+  push: PushFn
 ): void {
   // import 行の文字列指定子（末尾側）を先に確定
   let spec: string | null = null;
@@ -655,4 +654,45 @@ function regexScan(source: string): ScanResult {
     lineScope: new Array(lines.length).fill(0),
     degraded: true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 参照検索・出現ハイライト用: 識別子の出現位置
+// ---------------------------------------------------------------------------
+
+/**
+ * `name` と一致する識別子トークンの出現位置をすべて返す
+ * （文字列・コメント・正規表現の内側は含まない）。
+ * lex に失敗した場合は単語境界の正規表現で近似する。
+ */
+export function findOccurrences(source: string, name: string): Rng[] {
+  const normalized = source.replace(/\r\n?/g, "\n");
+  const out: Rng[] = [];
+  const tokens = safeLex(normalized);
+  if (tokens) {
+    const lineStarts = computeLineStarts(normalized);
+    for (const tok of tokens) {
+      if (
+        tok.type === SourceType.IDENTIFIER &&
+        normalized.slice(tok.start, tok.end) === name
+      ) {
+        out.push(rangeOf(tok, lineStarts));
+      }
+    }
+    return out;
+  }
+  // フォールバック: 単語境界の正規表現（文字列内の誤マッチは許容）
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?<![$A-Za-z0-9_])${escaped}(?![$A-Za-z0-9_])`, "g");
+  const lines = normalized.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(lines[i])) !== null) {
+      out.push({
+        start: { line: i, character: m.index },
+        end: { line: i, character: m.index + name.length },
+      });
+    }
+  }
+  return out;
 }
